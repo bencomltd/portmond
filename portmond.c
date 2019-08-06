@@ -141,11 +141,13 @@ static int portmon_daemon(void *udata)
     struct tm tm = *localtime(&t);
     int i;
     logit = 0;
-    read_conf_file(0);
+    
     /* open the system log */
     openlog("Portmond", LOG_NDELAY, LOG_DAEMON);
     syslog(LOG_INFO, "Portmond daemon started. PID: %ld Logging %d", (long)getpid(), logit);
 
+    read_conf_file(0);
+    
     /* create a file descriptor for signal handling */
     sigemptyset(&mask);
     /* handle the following signals */
