@@ -1,0 +1,9 @@
+Package: portmond
+Version: 1.0
+Architecture: armhf
+Maintainer: P Bennett <bencomltd16@gmail.com>
+Depends: pigpio
+Installed-Size: 20
+Homepage: http://zlham.blogspot.com
+Description: Portmond monitors Raspberry Pi GPIO for changes.
+ Portmond sends a GET request to the web server named in /etc/portmond/portmon.conf. Use sudo systemctl enable portmond to enable. sudo kill -sSIGUSR1 $pid checks state of all ports.
