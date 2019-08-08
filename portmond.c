@@ -68,8 +68,8 @@ char *ports_split;
 int logit;
 int ports_count = 0;
 int ports[MAX_GPIOS] = {255};
-//"http://192.168.1.3/input";
 static char *conf_file_name = "/etc/portmond/portmon.conf";
+
 /**
  * Read configuration file
  */
@@ -84,13 +84,6 @@ int read_conf_file(int reload)
         return -1;
     }
     ret = fscanf(conf_file, "%s", uri);
-    if (ret > 0) {
-        if (reload == 1) {
-            syslog(LOG_INFO, "Reloaded configuration file %s", conf_file_name);
-        } else {
-            syslog(LOG_INFO, "Configuration read from file %s",  conf_file_name);
-        }
-    }
     int i = 0;
     ret = fscanf(conf_file, "%s", &conf_ports);
     ports_split = strtok (&conf_ports,",:");
@@ -101,6 +94,13 @@ int read_conf_file(int reload)
     }
     ports_count = i;
     ret = fscanf(conf_file, "%d", &logit);
+    if (ret > 0) {
+        if (reload == 1) {
+            syslog(LOG_INFO, "Reloaded configuration file %s", conf_file_name);
+        } else {
+            syslog(LOG_INFO, "Configuration read from file %s",  conf_file_name);
+        }
+    }
     fclose(conf_file);
     return ret;
 }
@@ -127,7 +127,7 @@ void monitor(int gpio, int level, uint32_t tick)
     sprintf(fullUri, "%s/%04d-%02d-%02d/%02d:%02d:%02d/%d/%d/%u", uri, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, gpio, level, tick);
     if (logit)
         syslog(LOG_INFO, "URI %s", fullUri);
-     curl_get(fullUri);
+    curl_get(fullUri);
 }
 /* The daemon process body */
 static int portmon_daemon(void *udata)
@@ -141,13 +141,12 @@ static int portmon_daemon(void *udata)
     struct tm tm = *localtime(&t);
     int i;
     logit = 0;
-    
+
     /* open the system log */
     openlog("Portmond", LOG_NDELAY, LOG_DAEMON);
+    read_conf_file(0);
     syslog(LOG_INFO, "Portmond daemon started. PID: %ld Logging %d", (long)getpid(), logit);
 
-    read_conf_file(0);
-    
     /* create a file descriptor for signal handling */
     sigemptyset(&mask);
     /* handle the following signals */
@@ -158,6 +157,7 @@ static int portmon_daemon(void *udata)
        according to their default dispositions */
     if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
     {
+        syslog(LOG_ERR, "Could not block signals!");
         closelog();
         return EXIT_FAILURE;
     }
@@ -175,20 +175,19 @@ static int portmon_daemon(void *udata)
 
     if (gpioInitialise()<0) {
         syslog(LOG_INFO, "Portmond Pi GPIO Failed to Initialize. Is pigpiod running?");
+        closelog();
         return EXIT_FAILURE;
     }
-
-    int tick = 86400;
-    int tick2;
+    int tick;
     int level = 0;
     struct timeval waitd = {1, 0};
     //  16 Ports  17,18,27,22,23,24,25,5,6,12,13,19,16,26,20,21 example
     for (i=0; i<ports_count; i++) gpioSetPullUpDown(ports[i], PI_PUD_UP);
     for (i=0; i<ports_count; i++) gpioSetAlertFunc(ports[i], monitor);
     /* the daemon loop */
+    int result;
+    fd_set readset;
     while (!exit) {
-        int result;
-        fd_set readset;
         /* add the signal file descriptor to set */
         FD_ZERO(&readset);
         FD_SET(sfd, &readset);
@@ -199,7 +198,7 @@ static int portmon_daemon(void *udata)
                 if (tm.tm_sec == 0) {
                     for (i=0; i<ports_count; i++) {
                         level = gpioRead(ports[i]);
-                        sprintf(fullUri, "%s/%04d-%02d-%02d/%02d:%02d:%02d/%d/%d/%u", uri, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ports[i], level, tick);
+                        sprintf(fullUri, "%s/%04d-%02d-%02d/%02d:%02d:%02d/%d/%d/%u", uri, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ports[i], level, 86400);
                         curl_get(fullUri);
                     }
                     syslog(LOG_INFO, "Watchdog port watch done:");
@@ -238,10 +237,10 @@ static int portmon_daemon(void *udata)
                     syslog(LOG_INFO, "User Triggered port check.");
                     t = time(NULL);
                     tm = *localtime(&t);
-                    tick2 = gpioTick();
+                    tick = gpioTick();
                     for (i=0; i<ports_count; i++) {
                         level = gpioRead(ports[i]);
-                        sprintf(fullUri, "%s/%04d-%02d-%02d/%02d:%02d:%02d/%d/%d/%u", uri, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ports[i], level, tick2);
+                        sprintf(fullUri, "%s/%04d-%02d-%02d/%02d:%02d:%02d/%d/%d/%u", uri, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ports[i], level, tick);
                         curl_get(fullUri);
                     }
                     break;

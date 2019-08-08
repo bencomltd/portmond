@@ -1,0 +1,142 @@
+Portmond (portmond) is a custom daemon for the Raspberry Pi.
+It requires pigpio to be installed which is by default.
+Further more if you have enabled pigpiod it needs to be disabled.
+sudo apt-get install pigpio
+sudo systemctl disable pigpiod
+
+See README.md for build/install instructions.
+The make file includes two extra commands to make it easier to build
+debian packages. sudo make build_deb & sudo make build_deb_src
+
+Daemonize.
+ 
+I will not delve into the workings of daemonize. I chose it because it looks like a pretty
+complete package fullfilling all my requirements. To add daemonize to your project requires
+three lines of code.
+
+#include "daemonize.h"				/* Header file 						*/
+
+/* Main() /*
+int exit_code = 0;
+pid_t pid = rundaemon(0, 			/* Daemon creation flags. 				*/
+                      portmon_daemon, NULL, 	/* Daemon body function and its argument. 		*/
+                      &exit_code, 		/* Pointer to a variable to receive daemon exit code 	*/
+                      "/var/run/portmond.pid"); /* Full path to the PID-file (lock). 			*/
+
+Flags 0 uses the default daemon behavior. daemon func is the main daemon code function. No arguments are passed.
+Variable exit_code is provided to the daemon run function. Finally the location of the lock file.
+
+Creating a standard double fork daemon process with hooks etc.
+
+Portmond (portmond).
+
+I wanted to write a daemon that is simple yet reasonably full featured. Reliability is key here as the daemon is
+monitoring building entry points for an alarm system. Reinventing the wheel is not my thing hence the use of daemonize.
+I have hacked around making daemons in the past so I knew what I was looking at when I selected the 
+two top searches in google, downloaded both, read, make and test. Daemonize won hands down.
+
+Raspberry Pi GPIO.
+
+I like to play in the secure IoT realm however sometimes there can be some trade off's. The daemon runs as root.
+Of course this can be dangerous. If you want to make it less so you could set uid to a user that has access 
+to the gpio group.
+
+The daemon uses the pigpio library which requires either root or a user with gpio group access to read/write gpio.
+Linker flag -lpigpio (config.mk)
+#include <pigpio.h>
+
+CURL.
+
+Again I am not reinventing the wheel and curl easy is, well, all to easy and kiss. Almost all programs that I
+have written for IoT use cases use simple requests to convey some information to a web server. So the end point
+device initiates all communications. With embedded systems end points without realiable time keeping you can make
+simple http requests to get this information or other variables. However this daemon has no such requirement.
+So just blasting data at a server will suffice. On the server end just make sure you have enough running http daemons ready.     
+Linker flag -lcurl (config.mk)
+#include <curl/curl.h>
+
+Main.
+
+Flip back and forth between portmond.c and this file to follow the code explanation.
+
+Create a variable to hold the exit code to be returned when the daemon shuts down and intialze to 0 (Success).
+int exit_code = 0;
+
+Check for root and exit with error message.
+Run the daemon as per the Daemonize section above. 
+Check the returned pid for error conditions, print the error and return an exit code.
+Else if launch succeeded return EXIT_SUCCESS
+
+Thats it, daemon lauched.
+
+Portmon_daemon (portmon_daemon).
+
+This is the main code for the daemon. It has two main sections. Inilization and a while loop followed by tidy up code
+when the loop ends.
+
+The initialization stage comprises of setting up various program variables and opening the system log pipe.
+The configuration file is then read. The next section deals with signal handlers.
+First we create an empty signal set and populate it with the signals we wish to monitor (term, hup usr1).
+The signal mask is then processed. If the mask is not abled to be processed an error occurs.
+We can't have an unresponsive daemon can we so it exits?
+All ok, a signal file descriptor is created.
+Again if an error occured the daemon tidies up and exits.
+All ok, reads from the source file descriptor (sfd) are blocking.
+A two satge process is required, read the current flags then set the flags or'ed with O_NONBLOCK
+
+Next the gpio library is initialized. On error logit & EXIT_FAILURE
+This acts as a check to see if the pigpio daemon is running.
+All configured ports have their pull up enabled (Negative logic)
+and the callback function is set up (monitor).
+
+	  Reed Relay Closed
+
+gpio port 0v _______/v_______ common (-)
+
+	  Reed Relay Open
+
+gpio port +3.3v _______/ _______ common (-)
+
+This translates to 0 = Door Closed 1 = Door Open
+     
+while (!exit) {
+
+The main loop of a single thread daemon.
+
+Again code initializes variables such as time and stuff to read the signal files.
+Check time equal to midnight if so read the level of all configured ports and send data via http (CURL).
+Note sleep(1s) and the sleep(4s) to ensure the ports are not read and sent many times as the loop and pigpio
+response time is very short without adding sleep time. Without a delay a Pi3B+ gets through 4 loops. 
+When writing code of this nature, a non blocking loop, consideration of the load being put on the processor is
+a consideration in edge computing. IE. Hardware hook (gpio), monitor daemon (portmond), ml, ai and scripting => End Point (Apache2).
+
+No sleep means 100% cpu usage. A one second sleep drops it down considerable to perhaps 20% or so.  
+
+The next section handles signals (sudo kill -sSIGTERM $pid) it starts by using a non blocking call to select with a wait period (1s).
+If there is not signal to handle the program returns to the top of the loop. Nothing to do (result == 0).
+On error (result == -1) logit and return an error. If a signal is ready to handle read it.
+The signal number is checked and the appropriate actio taken.
+
+SIGTERM: Logit, set exit to 1 to break out of the main loop thereby shuttng down the daemon.
+SIGHUP: Logit and reload the configuration file.
+SIGUSR1: Logit, set up time/tick, read the level of all configured ports and send the data.
+default: Log unxpected signal.
+
+Loop Ended.
+Close gpio lib monitoring function gpioTerminate(), close file descriptors, unblock all signals, logit, close log and exit gracefully.   
+
+Gpio monitoring callback monitor(int gpio, int level, uint32_t tick).
+When the pigpio library detects a chane in a ports level it calls this function which...
+Gets the time, formats the uri, logit if logit = 1 and sends it using curl easy.
+
+Utility Functions:
+
+Web get URI. Set up curl variables and initialize a curl easy session. 
+If the curl session is ok set its options and perform the GET request.
+If error logit. Clean up curl session and return.
+
+Read configuration file. Set up varaibles for the function, open the configuration file, scan the file one line at a time, preprocess and store.
+The first line is used as is (uri). The second line is split on the comma and fills the ports[] array. The third line is used as is.
+Close the file and return.   
+
+    
