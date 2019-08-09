@@ -74,6 +74,7 @@ install : all
 	@echo "CP portmond.conf $(CFG_PATH)"
 	@cp -f portmon.conf $(CFG_PATH)
 	@echo "CP portmond.service $(SRV_PATH)"
+	@mkdir -p $(SRV_PATH)
 	@cp -f portmond.service $(SRV_PATH)
 ifdef STRIP
 	@$(STRIP) $(BINPATH)/$(OUT)
