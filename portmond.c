@@ -60,7 +60,7 @@ Upstream URL: https://bitbucket.org/arbv/daemonize
 #define MAX_GPIOS 32
 #define OPT_S_DEF 5
 
-char fullUri[100]={0};
+char fullUri[210]={0};
 // Full path http://host.name.ip.addr/input/year-month-day/hour:minute:second/port/level/tick
 char uri[100];
 char conf_ports;
