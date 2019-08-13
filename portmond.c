@@ -208,6 +208,8 @@ static int portmon_daemon(void *udata)
         }
         if ((tm.tm_hour != 23) && (tm.tm_min != 59) && (tm.tm_sec <= 55))
             sleep(4);
+        else
+        	sleep(1);
         /* non blocking wait for the data in the signal file descriptor */
         result = select(FD_SETSIZE, &readset, NULL, NULL, &waitd);
         if(result == 0) {
