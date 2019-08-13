@@ -275,7 +275,7 @@ int main(int argc, char **argv)
     pid_t pid = rundaemon(0, /* Daemon creation flags. */
                           portmon_daemon, NULL, /* Daemon body function and its argument. */
                           &exit_code, /* Pointer to a variable to receive daemon exit code */
-                          "/var/run/portmond.pid"); /* Full path to the PID-file (lock). */
+                          "/run/portmond.pid"); /* Full path to the PID-file (lock). */
     switch (pid)
     {
         case -1: /* Low level error. See errno for details. */

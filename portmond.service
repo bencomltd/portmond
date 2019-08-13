@@ -3,7 +3,7 @@ Description=Monitor Raspberry Pi GPIO ports
 
 [Service]
 Type=forking
-PIDFile=/var/run/portmond.pid
+PIDFile=/run/portmond.pid
 ExecStart=/usr/bin/portmond
 ExecReload=/bin/kill -HUP $MAINPID
 ExecStop=/bin/kill -TERM $MAINPID
