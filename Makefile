@@ -21,6 +21,8 @@ BLD_DEB_SRC_PATH = /home/pi/portmond-src-1.0
 # Manual prefix
 MANPREFIX = $(PREFIX)/share/man
 
+STATEFILE=$(CFG_PATH)/bsec_iaq.state
+
 # Generate object file names from source file names
 # C and C++ objects
 COBJ = $(SRC:.c=.${O}) $(CXX_SRC:.cpp=.${O})
@@ -73,6 +75,10 @@ install : all
 	@mkdir -p $(CFG_PATH)
 	@echo "CP portmond.conf $(CFG_PATH)"
 	@cp -f portmon.conf $(CFG_PATH)
+	@echo "CP bsec_iaq.config $(CFG_PATH)"
+	@cp -f $(BSEC_DIR)/config/$(CONFIG)/bsec_iaq.config $(CFG_PATH)
+	@echo "Touch $(STATEFILE)"
+	@touch $(STATEFILE)
 	@echo "CP portmond.service $(SRV_PATH)"
 	@mkdir -p $(SRV_PATH)
 	@cp -f portmond.service $(SRV_PATH)
@@ -102,6 +108,8 @@ uninstall :
 	@rm -f $(CFG_PATH)/portmon.conf
 	@echo "RM $(SRV_PATH)/portmond.service"
 	@rm -f $(SRV_PATH)/portmond.sevice
+	@rm -f $(CFG_PATH)/bsec_iaq.config
+	@rm -f $(CFG_PATH)/bsec_iaq.state
 # If defined manual files
 ifdef MANFILES
 	@for i in ${MANFILES} ; \

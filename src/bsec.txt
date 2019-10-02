@@ -1,0 +1,8 @@
+Download BSEC_x.x.x.x_Generic_Release from Bosch and place it in this directory.
+eg Dir /src/BSEC_1.4.7.4_Generic_Release
+Copy the driver and integration source to the portmond directory.
+bme680.c
+bme680.h
+bme680_defs.h
+bsec_integration.c
+bsec_integration.h

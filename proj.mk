@@ -2,7 +2,7 @@
 OUT = portmond
 
 # Project C sources
-SRC = daemonize.c portmond.c
+SRC = daemonize.c portmond.c bme680.c bsec_integration.c
 
 # Project C headers
 HEADERS = daemonize.h
@@ -21,4 +21,3 @@ AS_HEADERS =
 
 # Manuals
 MANFILES = 
-
